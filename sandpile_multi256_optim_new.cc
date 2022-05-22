@@ -15,9 +15,7 @@ public:
 	using size_type		= size_t;
 
 public:
-	Grid(){
-		clear();
-	}
+	Grid() = default;
 
 	Grid(T const f){
 		fill(f);
@@ -48,7 +46,7 @@ public:
 		fill(0);
 	}
 
-	void print(){
+	void print() const{
 		for(size_t y = 0; y < SizeY; ++y){
 			for(size_t x = 0; x < SizeX; ++x)
 				std::cout << operator()(x, y) << " ";
@@ -58,7 +56,7 @@ public:
 	}
 
 	template<class CH>
-	void prettyPrint(CH const &ch){
+	void prettyPrint(CH const &ch) const{
 		for(size_t y = 0; y < SizeY; ++y){
 			for(size_t x = 0; x < SizeX; ++x)
 				std::cout << ch[ operator()(x, y) ];
@@ -78,86 +76,86 @@ enum class NormalizeGrid_Neigbours{
 
 
 template<class Grid, NormalizeGrid_Neigbours neigbours = NormalizeGrid_Neigbours::Neumann>
-void normalizeGrid(Grid *grid1, Grid *grid2, typename Grid::value_type maxSand){
-	Grid *grid1_addr = grid1;
-
-	auto addSand = [](Grid &g, size_t const x, size_t const y, auto value){
-		if (x >= 0 && x < Grid::sizeX() && y >= 0 && y < Grid::sizeY())
-			g(x, y) += value;
-	};
-
-	bool running;
+const Grid &normalizeGrid(Grid &grid, typename Grid::value_type maxSand, typename Grid::value_type initialSand){
+	ssize_t running;
+	ssize_t fill;
+	ssize_t count = 0;
 
 	do{
-		running = false;
+		fill = 0;
 
-		grid2->clear();
+		running = 0;
 
-		for(size_t y = 0; y < Grid::sizeY(); ++y)
-			for(size_t x = 0; x < Grid::sizeX(); ++x){
-				auto const sand = grid1->operator ()(x, y);
+		// not iterating on first and last "element",
+		// allow us to be sure that y - 1, y + 1, x - 1, x + 1 are inside the buffer,
+		// so we skip one if statement later.
+		for(size_t y = 0 + 1; y < Grid::sizeY() - 1; ++y)
+			for(size_t x = 0 + 1; x < Grid::sizeX() - 1; ++x){
+				auto const sand = grid(x, y);
 
-				if (sand <= maxSand){
-					grid2->operator()(x, y) += sand;
-				}else{
+				if (sand > maxSand){
 					auto const sandF = sand / 4;
-					auto const sandD = sand % 4;
+				//	auto const sandD = sand % 4;
 
 					if (neigbours == NormalizeGrid_Neigbours::Neumann){
-						addSand(*grid2, x - 1, y    , sandF);
-						addSand(*grid2, x + 1, y    , sandF);
-						addSand(*grid2, x    , y - 1, sandF);
-						addSand(*grid2, x    , y + 1, sandF);
+						grid(x - 1, y    ) += sandF;
+						grid(x + 1, y    ) += sandF;
+						grid(x    , y - 1) += sandF;
+						grid(x    , y + 1) += sandF;
 					}else{
-						addSand(*grid2, x - 1, y - 1, sandF);
-						addSand(*grid2, x - 1, y + 1, sandF);
-						addSand(*grid2, x + 1, y - 1, sandF);
-						addSand(*grid2, x + 1, y + 1, sandF);
+						grid(x - 1, y - 1) += sandF;
+						grid(x - 1, y + 1) += sandF;
+						grid(x + 1, y - 1) += sandF;
+						grid(x + 1, y + 1) += sandF;
 					}
 
-					// no need indirection here...
-					grid2->operator()(x, y) += sandD;
+					grid(x, y) -= sandF * 4;
 
-					running = true;
+					++running;
+				}else if(sand > 0){
+					fill += sand;
 				}
+
 			}
 
-		std::swap(grid1, grid2);
+		if (++count % 256 == 0)
+			std::cerr << count << ' ' << running << ' ' << (initialSand - fill) << '\n';
 	}while(running);
 
-	if (grid1_addr == grid2)
-		*grid1 = *grid2;
+	// can be grid1 or grid2...
+	return grid;
 }
 
 
 
 using sint = uint32_t;
 
-constexpr size_t MAX = 2048 + 1024;
+constexpr size_t MAX = 4096;
 
-constexpr sint InitialSand = 500'000'000;
+constexpr sint InitialSand = 50'000'000;
 
-constexpr sint MaxSand = 256;
+constexpr sint MaxSand = 5;
 
 using MyGrid = Grid<sint, MAX, MAX>;
 
 MyGrid grid;
-MyGrid grid_temp;
 
 int main(){
 //	grid( MyGrid::sizeX() / 4 * 1, MyGrid::sizeY() / 2 ) = InitialSand;
 //	grid( MyGrid::sizeX() / 4 * 2, MyGrid::sizeY() / 2 ) = InitialSand;
 //	grid( MyGrid::sizeX() / 4 * 3, MyGrid::sizeY() / 2 ) = InitialSand;
 
+	grid.clear();
+
 	grid( MyGrid::sizeX() / 2, MyGrid::sizeY() / 2 ) = InitialSand;
 
-	normalizeGrid(&grid, &grid_temp, MaxSand);
+	const auto &result = normalizeGrid(grid, MaxSand, InitialSand);
 
 	std::cout << "P2\n";
 	std::cout << MyGrid::sizeX() << ' ' << MyGrid::sizeY() << "\n";
 	std::cout << MaxSand << "\n";
 
-	grid.print();
+	result.print();
 }
 
 
