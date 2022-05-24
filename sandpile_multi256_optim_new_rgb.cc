@@ -54,16 +54,6 @@ public:
 			std::cout << "\n";
 		}
 	}
-
-	template<class CH>
-	void prettyPrint(CH const &ch) const{
-		for(size_t y = 0; y < SizeY; ++y){
-			for(size_t x = 0; x < SizeX; ++x)
-				std::cout << ch[ operator()(x, y) ];
-
-			std::cout << "\n";
-		}
-	}
 };
 
 
@@ -97,7 +87,7 @@ const Grid &normalizeGrid(Grid &grid, typename Grid::value_type maxSand, typenam
 					auto const sandF = sand / 4;
 				//	auto const sandD = sand % 4;
 
-					if (neigbours == NormalizeGrid_Neigbours::Neumann){
+					if constexpr(neigbours == NormalizeGrid_Neigbours::Neumann){
 						grid(x - 1, y    ) += sandF;
 						grid(x + 1, y    ) += sandF;
 						grid(x    , y - 1) += sandF;
@@ -127,34 +117,45 @@ const Grid &normalizeGrid(Grid &grid, typename Grid::value_type maxSand, typenam
 
 
 
-using sint = uint32_t;
+using sint = uint64_t;
 
-constexpr size_t MAX = 1024;
+constexpr size_t MAX = 1024 * 4;
 
-constexpr sint InitialSand = 1'000'000;
+constexpr sint InitialSand = 1'000'000'000;
 
-constexpr sint MaxSand = 5;
+constexpr sint MaxSand = 0b0'1111'1111'1111;
 
 using MyGrid = Grid<sint, MAX, MAX>;
 
 MyGrid grid;
 
 int main(){
-//	grid( MyGrid::sizeX() / 4 * 1, MyGrid::sizeY() / 2 ) = InitialSand;
-//	grid( MyGrid::sizeX() / 4 * 2, MyGrid::sizeY() / 2 ) = InitialSand;
-//	grid( MyGrid::sizeX() / 4 * 3, MyGrid::sizeY() / 2 ) = InitialSand;
-
 	grid.clear();
 
-	grid( MyGrid::sizeX() / 2, MyGrid::sizeY() / 2 ) = InitialSand;
+	grid( MyGrid::sizeX() / 3, MyGrid::sizeY() / 2 ) = InitialSand;
 
 	const auto &result = normalizeGrid(grid, MaxSand, InitialSand);
 
-	std::cout << "P2\n";
-	std::cout << MyGrid::sizeX() << ' ' << MyGrid::sizeY() << "\n";
-	std::cout << MaxSand << "\n";
+	auto cc = [](auto, auto pixel, auto mask, auto shift){
+		return ( ( pixel & mask ) >> (4 * shift) ) * 16;
+	};
 
-	result.print();
+	std::cout << "P3\n";
+	std::cout << MyGrid::sizeX() << ' ' << MyGrid::sizeY() << "\n";
+	std::cout << 255 << "\n";
+
+	for(size_t y = 0; y < MyGrid::sizeY(); ++y){
+		for(size_t x = 0; x < MyGrid::sizeX(); ++x){
+			auto const pixel = result(x, y);
+
+			std::cout << cc('R', pixel, 0b0'1111'0000'0000, 2) << " ";
+			std::cout << cc('G', pixel, 0b0'0000'1111'0000, 1) << " ";
+			std::cout << cc('B', pixel, 0b0'0000'0000'1111, 0) << " ";
+		}
+
+		std::cout << "\n";
+	}
+
 }
 
 
